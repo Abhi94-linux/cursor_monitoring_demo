@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Servers · Server Monitor{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Servers</h1>
+    <p class="lede">Current readings refresh every 15 seconds. This page only displays them.</p>
+  </div>
+  <a class="button" href="{{ url_for('add_server') }}">Add server</a>
+</div>
+{% if rows %}
+<div class="table-wrap card">
+  <table>
+    <caption>Monitored Linux servers</caption>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Host</th>
+        <th>Status</th>
+        <th class="num">CPU</th>
+        <th class="num">Memory</th>
+        <th>Fullest disk</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><a href="{{ url_for('server_detail', server_id=row.id) }}">{{ row.name }}</a></td>
+        <td class="host">{{ row.host }}:{{ row.port }}</td>
+        <td>
+          <span class="pill {{ row.status }}">{{ row.status }}</span>
+          {% if row.last_error %}
+          <span class="error-text">{{ row.last_error }}</span>
+          {% endif %}
+        </td>
+        <td class="num">
+          {% if row.latest is none %}
+          —
+          {% elif row.latest.cpu_percent is none %}
+          Waiting for next sample
+          {% else %}
+          {{ "%.1f"|format(row.latest.cpu_percent) }}%
+          {% endif %}
+        </td>
+        <td class="num">
+          {% if row.latest is none %}
+          —
+          {% else %}
+          {{ "%.1f"|format(row.latest.memory.used_percent) }}%
+          {% endif %}
+        </td>
+        <td>
+          {% if row.disk %}
+          {{ row.disk.percent }}% on {{ row.disk.mount }}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<section class="card empty">
+  <h2>No servers yet</h2>
+  <p>Add a Linux host to start reading CPU, memory, disk, network, and processes.</p>
+</section>
+{% endif %}
+{% endblock %}

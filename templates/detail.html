@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}{{ server.name }} · Server Monitor{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block content %}
+{% macro processes(rows) %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th class="num">PID</th>
+        <th class="num">CPU</th>
+        <th class="num">Memory</th>
+        <th>Command</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for proc in rows %}
+      <tr>
+        <td>{{ proc.user }}</td>
+        <td class="num">{{ proc.pid }}</td>
+        <td class="num">{{ "%.1f"|format(proc.cpu) }}%</td>
+        <td class="num">{{ "%.1f"|format(proc.mem) }}%</td>
+        <td class="cmd" title="{{ proc.command }}">{{ proc.command }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">No processes reported.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+<p class="back"><a href="{{ url_for('index') }}">All servers</a></p>
+<div class="page-head">
+  <div>
+    <h1>{{ server.name }}</h1>
+    <p class="lede">{{ server.host }}:{{ server.port }}</p>
+  </div>
+  <span class="pill {{ server.status }}">{{ server.status }}</span>
+</div>
+
+<section class="card">
+  <h2>Summary</h2>
+  {% if server.last_error %}
+  <p class="banner bad" role="status">{{ server.last_error }}</p>
+  {% endif %}
+  <dl class="facts">
+    <div><dt>Status</dt><dd class="pill {{ server.status }}">{{ server.status }}</dd></div>
+    <div><dt>Host</dt><dd>{{ server.host }}</dd></div>
+    <div><dt>SSH port</dt><dd>{{ server.port }}</dd></div>
+    <div><dt>Last success</dt><dd>{{ server.last_success|when }}</dd></div>
+  </dl>
+</section>
+
+{% if server.latest %}
+<section class="card">
+  <h2>CPU</h2>
+  <div class="stats">
+    <p><span>Now</span><strong>{{ server.latest.cpu_percent|cpu }}</strong></p>
+    <p><span>Load 1m</span><strong>{{ "%.2f"|format(server.latest.load[0]) }}</strong></p>
+    <p><span>Load 5m</span><strong>{{ "%.2f"|format(server.latest.load[1]) }}</strong></p>
+    <p><span>Load 15m</span><strong>{{ "%.2f"|format(server.latest.load[2]) }}</strong></p>
+  </div>
+  <div class="chart-box"><canvas id="cpu-chart" aria-label="CPU percent for the last 30 minutes" role="img"></canvas></div>
+</section>
+
+<section class="card">
+  <h2>Memory</h2>
+  <div class="stats">
+    <p><span>Total</span><strong>{{ server.latest.memory.total|bytes }}</strong></p>
+    <p><span>Used</span><strong>{{ server.latest.memory.used|bytes }}</strong></p>
+    <p><span>Free</span><strong>{{ server.latest.memory.free|bytes }}</strong></p>
+    <p><span>Swap</span><strong>{% if server.latest.memory.swap_total == 0 %}None{% else %}{{ server.latest.memory.swap_used|bytes }} / {{ server.latest.memory.swap_total|bytes }}{% endif %}</strong></p>
+  </div>
+  <div class="chart-box"><canvas id="memory-chart" aria-label="Used memory percent for the last 30 minutes" role="img"></canvas></div>
+</section>
+
+<section class="card">
+  <h2>Disk</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Mount</th>
+          <th class="num">Size</th>
+          <th class="num">Used</th>
+          <th class="num">Available</th>
+          <th class="num">Use</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for disk in server.latest.disks %}
+        <tr>
+          <td>{{ disk.mount }}</td>
+          <td class="num">{{ disk.size|bytes }}</td>
+          <td class="num">{{ disk.used|bytes }}</td>
+          <td class="num">{{ disk.available|bytes }}</td>
+          <td class="num">{{ disk.percent }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Network</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Interface</th>
+          <th class="num">In</th>
+          <th class="num">Out</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for iface in server.latest.interfaces %}
+        <tr>
+          <td>{{ iface.name }}</td>
+          <td class="num">{{ iface.in_bps|rate }}</td>
+          <td class="num">{{ iface.out_bps|rate }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="chart-box"><canvas id="net-chart" aria-label="Total network in and out for the last 30 minutes" role="img"></canvas></div>
+</section>
+
+<section class="card">
+  <h2>Processes</h2>
+  <div class="split">
+    <div>
+      <h3>Top 10 by CPU</h3>
+      {{ processes(server.latest.processes_cpu) }}
+    </div>
+    <div>
+      <h3>Top 10 by memory</h3>
+      {{ processes(server.latest.processes_mem) }}
+    </div>
+  </div>
+</section>
+{% elif server.status == 'pending' %}
+<section class="card empty">
+  <h2>Waiting for the first poll</h2>
+  <p>Readings appear here after the first SSH connection. This page checks again every few seconds.</p>
+</section>
+{% else %}
+<section class="card empty">
+  <h2>No readings yet</h2>
+  <p>The last connection failed before a sample was stored.</p>
+</section>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const payload = {{ server.chart|tojson }};
+  const ticks = { maxTicksLimit: 6, color: "#5c675f" };
+  const grid = { color: "#e6e0d4" };
+  function lineChart(id, datasets, percent) {
+    const canvas = document.getElementById(id);
+    if (!canvas || !window.Chart || !payload.labels.length) return;
+    new Chart(canvas, {
+      type: "line",
+      data: { labels: payload.labels, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        spanGaps: false,
+        plugins: { legend: { position: "bottom", labels: { color: "#17211b" } } },
+        scales: {
+          x: { ticks: ticks, grid: grid },
+          y: {
+            beginAtZero: true,
+            suggestedMax: percent ? 100 : undefined,
+            ticks: { color: "#5c675f" },
+            grid: grid
+          }
+        }
+      }
+    });
+  }
+  lineChart("cpu-chart", [{
+    label: "CPU %",
+    data: payload.cpu,
+    borderColor: "#0e6b45",
+    backgroundColor: "rgba(14, 107, 69, 0.12)",
+    tension: 0.2,
+    pointRadius: 2
+  }], true);
+  lineChart("memory-chart", [{
+    label: "Memory used %",
+    data: payload.memory,
+    borderColor: "#1d4e89",
+    backgroundColor: "rgba(29, 78, 137, 0.12)",
+    tension: 0.2,
+    pointRadius: 2
+  }], true);
+  lineChart("net-chart", [
+    {
+      label: "In",
+      data: payload.net_in,
+      borderColor: "#0e6b45",
+      tension: 0.2,
+      pointRadius: 2
+    },
+    {
+      label: "Out",
+      data: payload.net_out,
+      borderColor: "#9d2c2c",
+      tension: 0.2,
+      pointRadius: 2
+    }
+  ], false);
+</script>
+{% endblock %}

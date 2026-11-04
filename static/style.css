@@ -155,6 +155,17 @@ button, .button {
 
 .page-head .button { margin-top: 0; }
 
+td form { margin: 0; }
+
+.remove {
+  margin-top: 0;
+  min-height: 32px;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid #e7b4b4;
+  background: var(--red-bg);
+  color: var(--red);
+}
+
 .ghost {
   margin-top: 0;
   border: 1px solid rgba(247, 244, 236, 0.45);

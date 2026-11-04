@@ -5,7 +5,7 @@
 <div class="page-head">
   <div>
     <h1>Servers</h1>
-    <p class="lede">Current readings refresh every 15 seconds. This page only displays them.</p>
+    <p class="lede">Current readings refresh every 15 seconds. Remove drops a server from this list.</p>
   </div>
   <a class="button" href="{{ url_for('add_server') }}">Add server</a>
 </div>
@@ -21,6 +21,7 @@
         <th class="num">CPU</th>
         <th class="num">Memory</th>
         <th>Fullest disk</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -56,6 +57,12 @@
           {% else %}
           —
           {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('remove_server', server_id=row.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="remove" type="submit">Remove</button>
+          </form>
         </td>
       </tr>
       {% endfor %}

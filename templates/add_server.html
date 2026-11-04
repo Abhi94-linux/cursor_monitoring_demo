@@ -3,7 +3,7 @@
 {% block content %}
 <section class="card narrow">
   <h1>Add server</h1>
-  <p class="lede">SSH is used only to run a fixed set of read-only commands. The host cannot be changed from this app, and this form cannot edit or remove a server later.</p>
+  <p class="lede">SSH is used only to run a fixed set of read-only commands. The host cannot be changed from this app. Use Remove on the server list to drop a server.</p>
   {% if errors %}
   <div class="banner bad" role="alert">
     {% for error in errors %}
@@ -12,6 +12,7 @@
   </div>
   {% endif %}
   <form method="post" action="{{ url_for('add_server') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label for="name">Display name</label>
     <input id="name" name="name" value="{{ form.name }}" maxlength="80" required>
     <label for="host">Host</label>

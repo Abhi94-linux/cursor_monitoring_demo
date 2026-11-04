@@ -6,8 +6,18 @@ import os
 import threading
 import time
 import uuid
+from pathlib import Path
 
 HISTORY_SECONDS = 30 * 60
+
+
+def demo_server_path(root):
+    """Resolve data/servers.json and refuse a path that leaves data/."""
+    data = (Path(root) / "data").resolve()
+    path = (data / "servers.json").resolve()
+    if path.parent != data:
+        raise ValueError("server list must stay inside data/")
+    return path
 
 
 class Store:
@@ -48,6 +58,16 @@ class Store:
             self._write()
             self.metrics[server["id"]] = _empty_state()
         return copy.deepcopy(server)
+
+    def remove(self, server_id):
+        with self.lock:
+            kept = [item for item in self.servers if item["id"] != server_id]
+            if len(kept) == len(self.servers):
+                return False
+            self.servers = kept
+            self.metrics.pop(server_id, None)
+            self._write()
+            return True
 
     def servers_for_poll(self):
         with self.lock:
